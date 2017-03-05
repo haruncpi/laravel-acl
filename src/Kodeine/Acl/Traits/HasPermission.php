@@ -193,4 +193,51 @@ trait HasPermission
 
         return (int) $permission;
     }
+    
+   
+    /*
+         * @return boolean
+         * $userId
+         * $module is name of module like student,teacher
+         * $permissions is a assoc array
+     */
+    function assignPermission($userId, $module, $permissions)
+    {
+        $permissionString = json_encode($permissions);
+
+        $qry = \DB::select('SELECT count(permissions.id) total FROM permissions
+                    LEFT JOIN permission_user
+                    ON permissions.id=permission_user.`permission_id`
+                    WHERE user_id=:user_id AND name=:name', ['user_id' => $userId, 'name' => $module])[0];
+
+        //check module permission already exist with $userId
+        if ($qry->total) {
+            //now get the module permission record of user
+            $result = \DB::select('SELECT permissions.id,name,user_id,slug FROM permissions
+                                LEFT JOIN permission_user
+                                ON permissions.id=permission_user.`permission_id`
+                    WHERE user_id=:user_id AND name=:name', ['user_id' => $userId, 'name' => $module])[0];
+
+            //var_dump(json_encode($permissions));
+            $permissionString = json_encode($permissions);
+            $p = \DB::table('permissions')
+                ->where('id', $result->id)->update(['slug' => $permissionString]);
+
+            if ($p) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            //if module of permission not exit with $userId
+            $pId = \DB::table('permissions')->insertGetId(['name' => $module, 'slug' => $permissionString]);
+            if ($pId) {
+                \DB::table('permission_user')->insert(['permission_id' => $pId, 'user_id' => $userId]);
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
 }
